@@ -2,21 +2,21 @@ import { createContext, useContext, useState } from "react"
 import * as React from 'react';
 import { produce } from "immer";
 
+function genKey(trace: number[]) {
+    return trace.join('-');
+}
 class Valid {
     map: { [key: string]: boolean } = {};
 
     constructor() {}
 
-    static genKey(trace: number[]) {
-        return trace.join('-');
-    }
 
     insertErr(trace: number[]) {
-        this.map[Valid.genKey(trace)] = true;
+        this.map[genKey(trace)] = true;
         return this;
     }
     clearErr(trace: number[]) {
-        delete this.map[Valid.genKey(trace)];
+        delete this.map[genKey(trace)];
         return this;
     }
     getErrs() {
@@ -119,12 +119,11 @@ function TreeView(props: {node: TreeNode }): JSX.Element {
         if (errs.length == 0) {
             return null;
         }
-        return <div style={{ color: 'red' }}>
+        return <span style={{ color: 'red' }}>
             非法的 {errs.map(s => <span>{s},</span>)}
-        </div>;
+        </span>;
     }
     return <div>
-        <ErrorPrompt/>
         <input type="text" value={props.node.value} onChange={e => {
             let v = e.target.value;
             setTree(root => {
@@ -134,11 +133,12 @@ function TreeView(props: {node: TreeNode }): JSX.Element {
                 return new_root;
             });
         }} />
+        <ErrorPrompt/>
         <div style={{display: 'flex', flexDirection: 'row'}}>
             <div style={{width: 20}}></div>
             <div>
                  {/* NOTE: 這個 key 選得很糟 */}
-                {props.node.children.map((child, i)=> <TreeView key={i} node={child}/>)}
+                {props.node.children.map((child, i)=> <TreeView key={genKey(props.node.trace)} node={child}/>)}
             </div>
         </div>
     </div>
@@ -150,10 +150,34 @@ export function TreeEditor() {
         return <TreeView node={tree} />
     }
     let [tree, setTree] = useState(initialTreeState);
-    return <TreeContext.Provider value={{setTree: (handler) => {
+    return <TreeContext.Provider value={{setTree: React.useCallback((handler) => {
         setTree(handler);
-    }, tree}}>
+    }, []), tree}}>
         <TreeEditorInner/>
+        <button onClick={() => {
+            setTree(root => {
+                let new_root = produce(root, (root) => {
+                    updateTree(root, [0, 1, 0], "測試字串YAAA");
+                });
+                return new_root;
+            });
+        }}>按看看 0-1-0</button>
+        <button onClick={() => {
+            setTree(root => {
+                let new_root = produce(root, (root) => {
+                    updateTree(root, [0, 1, 0], "");
+                });
+                return new_root;
+            });
+        }}>清掉 0-1-0</button>
+        <button onClick={() => {
+            setTree(root => {
+                let new_root = produce(root, (root) => {
+                    updateTree(root, [0, 0], "測試字串YOOO");
+                });
+                return new_root;
+            });
+        }}>按看看 0-0</button>
     </TreeContext.Provider>;
 }
 
