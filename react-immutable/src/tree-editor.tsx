@@ -1,5 +1,5 @@
 import produce from "immer";
-import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useState } from "react"
 
 type TreeNode = {
     valid: boolean,
@@ -117,11 +117,12 @@ function useTreeState() {
 
 function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
     const [editing, setEditing] = useState(false);
+    const [input_element, setInputElement] = useState<null | HTMLInputElement>(null);
     const tree_state = useContext(TreeContext);
-    const input_element = useRef<HTMLInputElement>(null);
-    useEffect(() => {
-        console.log(`input_element.current = ${input_element.current}`)
-        if (!input_element.current) { return; }
+    const onRef = useCallback(cur => {
+        setInputElement(cur);
+        console.log(`input_element.current = ${cur}`);
+        if (!cur) { return; }
         console.log(`refTree = ${refTree}`);
         let cur_ref = refTree;
         let cur_state = tree_state!.tree;
@@ -129,9 +130,9 @@ function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
             cur_ref = cur_ref.children[br];
             cur_state = cur_state.children[br];
         }
-        cur_ref.ref = input_element.current;
-        input_element.current.value = cur_state.name;
-    }, [props.path, tree_state, editing]);
+        cur_ref.ref = cur;
+        cur.value = cur_state.name;
+    }, [props.path, tree_state]);
     // useEffect();
     console.log('執行');
     if (tree_state == null) {
@@ -141,14 +142,14 @@ function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
         // setValue(evt.target.value);
     };
     const onComplete = () => {
-        tree_state.setNode(props.path, (node) => {node.name = input_element.current!.value;})
+        tree_state.setNode(props.path, (node) => {node.name = input_element!.value;})
         setEditing(false)
     }
     return <div>
         {
             editing ?
                 <div>
-                    <input autoFocus ref={input_element} onChange={onChange} />
+                    <input autoFocus ref={onRef} onChange={onChange} />
                     <button onClick={onComplete}>完成</button>
                 </div>
                 : <div>
