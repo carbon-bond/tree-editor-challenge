@@ -3,48 +3,40 @@ import { createContext, useCallback, useContext, useState } from "react"
 
 type TreeNode = {
     valid: boolean,
-    flush: boolean
     name: string,
     children: TreeNode[]
 }
 
 const initialTreeState: TreeNode = {
     valid: true,
-    flush: false,
     name: '世界',
     children: [
         {
             valid: false,
-            flush: false,
             name: 'xmowpaz3zujpmopgapofjo',
             children: [],
         },
         {
             valid: true,
-            flush: false,
             name: '生物',
             children: [
                 {
                     valid: true,
-                    flush: false,
                     name: '哺乳類',
                     children: [],
                 },
                 {
                     valid: true,
-                    flush: false,
                     name: '爬蟲類',
                     children: [],
                 },
                 {
                     valid: true,
-                    flush: false,
                     name: '鳥類',
                     children: [],
                 },
                 {
                     valid: true,
-                    flush: false,
                     name: '昆蟲',
                     children: [],
                 },
@@ -70,11 +62,26 @@ function createRefNode(root: TreeNode): RefNode {
 }
 
 const refTree = createRefNode(initialTreeState);
+const setRefTree = (path: number[], updater: (node: RefNode) => void ) => {
+    let cur = refTree;
+    for (let br of path) {
+        cur = cur.children[br];
+    }
+    updater(cur);
+}
+const deleteRefNode = (path: number[]) => {
+    let cur = refTree;
+    for (let br of path.slice(0, path.length - 1)) {
+        cur = cur.children[br];
+    }
+    cur.children.splice(path[path.length - 1], 1);
+}
 
 const TreeContext = createContext<null | {
     tree: TreeNode,
     setTree: React.Dispatch<React.SetStateAction<TreeNode>>,
-    setNode: (path: number[], updater: (node: TreeNode) => void) => void
+    setNode: (path: number[], updater: (node: TreeNode) => void) => void,
+    deleteNode: (path: number[]) => void
 }>(null);
 
 function ResetButton(props: { path: number[] }) {
@@ -85,7 +92,6 @@ function ResetButton(props: { path: number[] }) {
     const onClick = () => {
         tree_state.setNode(props.path, (node) => {
             node.name = '';
-            node.flush = !node.flush;
         })
     };
     return <button onClick={onClick}>重置{props.path.join('-')}</button>
@@ -112,7 +118,18 @@ function useTreeState() {
         console.log(JSON.stringify(new_tree));
         setTree(new_tree);
     }
-    return { tree, setTree, setNode };
+    const deleteNode = (path: number[]): void => {
+        const new_tree = produce(tree, draft => {
+            let cur = draft;
+            for (let br of path.slice(0, path.length - 1)) {
+                cur = cur.children[br];
+            }
+            cur.children.splice(path[path.length - 1], 1);
+        });
+        console.log(JSON.stringify(new_tree));
+        setTree(new_tree);
+    }
+    return { tree, setTree, setNode, deleteNode };
 }
 
 function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
@@ -133,7 +150,6 @@ function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
         cur_ref.ref = cur;
         cur.value = cur_state.name;
     }, [props.path, tree_state]);
-    // useEffect();
     console.log('執行');
     if (tree_state == null) {
         return <div>本行文字不該出現</div>;
@@ -144,7 +160,26 @@ function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
     const onComplete = () => {
         tree_state.setNode(props.path, (node) => {node.name = input_element!.value;})
         setEditing(false)
-    }
+    };
+    const onAdd = () => {
+        tree_state.setNode(props.path, (node) => {
+            node.children.push({
+                valid: true,
+                name: '',
+                children: []
+            })
+        })
+        setRefTree(props.path, (node) => {
+            node.children.push({
+                ref: null,
+                children: []
+            });
+        })
+    };
+    const onDelete = () => {
+        tree_state.deleteNode(props.path);
+        deleteRefNode(props.path);
+    };
     return <div>
         {
             editing ?
@@ -155,6 +190,8 @@ function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
                 : <div>
                     <span style={{ color: props.node.valid ? 'black' : 'red' }}>{props.node.name}</span>
                     <button onClick={() => { setEditing(true) }}>修改</button>
+                    <button onClick={onAdd}>增加</button>
+                    <button onClick={onDelete}>刪除</button>
                 </div>
         }
         <div style={{ display: 'flex', flexDirection: 'row' }}>
@@ -164,7 +201,7 @@ function TreeView(props: { node: TreeNode, path: number[] }): JSX.Element {
                 {props.node.children.map((child, index) => {
                     let path = props.path.slice();
                     path.push(index);
-                    return <TreeView key={`${index}-${child.flush}`} node={child} path={path} />
+                    return <TreeView key={`${index}`} node={child} path={path} />
                 })}
             </div>
         </div>
